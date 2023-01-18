@@ -1,11 +1,11 @@
 {
-    "info": "chemical_collider_task_cmi",
-    "obs_keys": ["obj0", "obj1", "obj2", "obj3", "obj4"],
-    "goal_keys": ["target_obj0", "target_obj1", "target_obj2", "target_obj3", "target_obj4"],
+    "info": "breakout_dynamics_cmi",
+    "obs_keys": ["Ball", "Paddle", "Block80","Block81","Block82","Block83","Block84","Block85","Block86","Block87","Block88","Block89","Block90","Block91","Block92","Block93","Block94","Block95", "Block96", "Block97", "Block98", "Block99"],
+    "goal_keys": [],
     "seed": 0,
     "cuda_id": 0,
     "env_params": {
-        "env_name": "Chemical",
+        "env_name": "Breakout",
         "num_env": 1,
         "causal_env_params": {
             "robots": "UR5e",
@@ -52,22 +52,25 @@
             "g": "{0-3}->4",
             "match_type": "all",
             "dense_reward": true
+        },
+        "breakout_env_params": {
+            "continuous_pos": true
         }
     },
     "training_params": {
         "inference_algo": "cmi",
-        "rl_algo": "model_based",
-        "load_inference": "put_model_path_here",
+        "rl_algo": "random",
+        "load_inference": "",
         "load_model_based": "",
         "load_policy": "",
         "load_replay_buffer": "",
         "total_steps": 500000,
-        "init_steps": 250,
+        "init_steps": 10000,
         "collect_env_step": true,
-        "inference_gradient_steps": 0,
-        "policy_gradient_steps": 1,
+        "inference_gradient_steps": 1,
+        "policy_gradient_steps": 0,
         "saving_freq": 5000,
-        "plot_freq": 10000,
+        "plot_freq": 1000,
         "replay_buffer_params": {
             "capacity": 500000,
             "max_sample_time": 128,

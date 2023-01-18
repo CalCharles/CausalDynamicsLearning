@@ -176,6 +176,17 @@ def plot_adjacency_intervention_mask(params, model, writer, step):
         plt.xticks([0.5 * feature_dim, feature_dim + 0.5 * action_dim], ["feature", "action"], rotation=90)
     fig.tight_layout()
     writer.add_figure("adjacency", fig, step + 1)
+    
+    # # AWFUL HACK!!!!
+    # images_out_path = "../cdl_causal_graph_out_2/"
+
+    # if not os.path.exists(images_out_path):
+    #     os.makedirs(images_out_path)
+
+    # this_image = images_out_path + ("step_%d.png" % step)
+
+    # fig.savefig(this_image)
+
     plt.close("all")
 
 

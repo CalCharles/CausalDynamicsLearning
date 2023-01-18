@@ -6,12 +6,18 @@ import shutil
 import random
 import numpy as np
 
+import sys
+
+sys.path.insert(0, "/home/oscar/Research/ML_EID/Environments/Environment/")
+
+print(sys.path)
+
 from robosuite.controllers import load_controller_config
 from robosuite.utils.input_utils import *
 from env.physical_env import Physical
 from env.chemical_env import Chemical
 from utils.multiprocessing_env import SubprocVecEnv
-
+from Environments.Breakout.breakout_screen import Breakout
 
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
@@ -149,7 +155,7 @@ def update_obs_act_spec(env, params):
     get act_dim and obs_spec from env and add to params
     """
     params.continuous_state = params.continuous_action = params.continuous_factor = \
-        not isinstance(env, (Physical, Chemical))
+        not isinstance(env, (Physical, Chemical, Breakout))
     if params.encoder_params.encoder_type == "conv":
         params.continuous_state = True
 
@@ -197,6 +203,8 @@ def get_single_env(params, render=False):
         env = Physical(params)
     elif env_name == "Chemical":
         env = Chemical(params)
+    elif env_name == "Breakout":
+        env = Breakout()
     else:
         raise ValueError("Unknown env_name: {}".format(env_name))
 

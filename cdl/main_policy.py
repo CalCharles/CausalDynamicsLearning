@@ -1,6 +1,5 @@
 import os
 import numpy as np
-
 import torch
 from torch.utils.tensorboard import SummaryWriter
 np.set_printoptions(precision=3, suppress=True)
@@ -29,6 +28,8 @@ from env.chemical_env import Chemical
 def train(params):
     device = torch.device("cuda:{}".format(params.cuda_id) if torch.cuda.is_available() else "cpu")
     set_seed_everywhere(params.seed)
+
+    print(device)
 
     params.device = device
     training_params = params.training_params

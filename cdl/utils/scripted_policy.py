@@ -336,6 +336,28 @@ class ScriptedPickAndPlace:
         return self.policies[0].act_randomly()
 
 
+class ScriptedBreakout:
+    def __init__(self, env, params):
+        self.env = env
+        self.params = params
+        self.action_dim = params.action_dim
+
+    def reset(self, *args):
+        pass
+
+    def act(self, obs, deterministic=True):
+        return self.act_randomly()
+
+    def act_randomly(self,):
+        return np.random.randint(self.action_dim)
+        # below for collecting dense graph only
+        # p = np.concatenate([[i * 0.5 + 1.0] * 5 for i in range(10)])
+        # p /= p.sum()
+        # a = np.random.multinomial(1, p).argmax()
+        # return a
+
+
+
 def get_scripted_policy(env, params):
     env_name = params.env_params.env_name
     is_vecenv = params.env_params.num_env > 1
@@ -348,5 +370,7 @@ def get_scripted_policy(env, params):
         return ScriptedPhysical(env, params)
     elif env_name == "Chemical":
         return ScriptedChemical(env, params)
+    elif env_name == "Breakout":
+        return ScriptedBreakout(env, params)
     else:
         raise ValueError("Unknown env_name: {}".format(env_name))

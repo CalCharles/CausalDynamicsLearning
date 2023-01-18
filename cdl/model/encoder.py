@@ -16,6 +16,8 @@ class IdentityEncoder(nn.Module):
     def __init__(self, params):
         super().__init__()
 
+        # print(params)
+
         self.params = params
         self.keys = [key for key in params.obs_keys if params.obs_spec[key].ndim == 1]
         self.feature_dim = np.sum([len(params.obs_spec[key]) for key in self.keys])
@@ -24,6 +26,10 @@ class IdentityEncoder(nn.Module):
         self.feature_inner_dim = None
         if not self.continuous_state:
             self.feature_inner_dim = np.concatenate([params.obs_dims[key] for key in self.keys])
+
+        # print("************************ Feature Inner Dim")
+        # print(self.keys)
+        # print(self.feature_inner_dim)
 
         self.to(params.device)
 
@@ -40,6 +46,12 @@ class IdentityEncoder(nn.Module):
             obs = [obs_k_i
                    for k in self.keys
                    for obs_k_i in torch.unbind(obs[k], dim=-1)]
+
+            # for obs_i, obs_i_dim in zip(obs, self.feature_inner_dim):
+            #     print(obs_i)
+            #     print(obs_i_dim)
+            #     print("**************************************")
+
             obs = [F.one_hot(obs_i.long(), obs_i_dim).float() if obs_i_dim > 1 else obs_i.unsqueeze(dim=-1)
                    for obs_i, obs_i_dim in zip(obs, self.feature_inner_dim)]
             # overwrite some observations for out-of-distribution evaluation
