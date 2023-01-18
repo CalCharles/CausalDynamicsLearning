@@ -8,6 +8,7 @@ import numpy as np
 
 import sys
 
+# TODO: Update me please
 sys.path.insert(0, "/home/oscar/Research/ML_EID/Environments/Environment/")
 
 print(sys.path)
