@@ -1,31 +1,45 @@
 import os
 import numpy as np
 import torch
+import sys
+import time
 from torch.utils.tensorboard import SummaryWriter
-np.set_printoptions(precision=3, suppress=True)
-torch.set_printoptions(precision=3, sci_mode=False)
+np.set_printoptions(precision=3, suppress=True, threshold=3000)
+torch.set_printoptions(precision=3, sci_mode=False, threshold=3000)
 
-from model.inference_mlp import InferenceMLP
-from model.inference_gnn import InferenceGNN
-from model.inference_reg import InferenceReg
-from model.inference_nps import InferenceNPS
-from model.inference_cmi import InferenceCMI
+from Baselines.CDL.model.inference_mlp import InferenceMLP
+from Baselines.CDL.model.inference_gnn import InferenceGNN
+from Baselines.CDL.model.inference_reg import InferenceReg
+from Baselines.CDL.model.inference_nps import InferenceNPS
+from Baselines.CDL.model.inference_cmi import InferenceCMI
 
-from model.random_policy import RandomPolicy
-from model.hippo import HiPPO
-from model.model_based import ModelBased
+from Baselines.CDL.model.random_policy import RandomPolicy
+from Baselines.CDL.model.hippo import HiPPO
+from Baselines.CDL.model.model_based import ModelBased
 
-from model.encoder import make_encoder
+from Baselines.CDL.model.encoder import make_encoder
 
-from utils.utils import TrainingParams, update_obs_act_spec, set_seed_everywhere, get_env, get_start_step_from_model_loading
-from utils.replay_buffer import ReplayBuffer, PrioritizedReplayBuffer
-from utils.plot import plot_adjacency_intervention_mask
-from utils.scripted_policy import get_scripted_policy, get_is_demo
+from Baselines.CDL.utils.utils import TrainingParams, update_obs_act_spec, set_seed_everywhere, get_env, get_start_step_from_model_loading
+from Baselines.CDL.utils.replay_buffer import ReplayBuffer, PrioritizedReplayBuffer
+from Baselines.CDL.utils.plot import plot_adjacency_intervention_mask
+from Baselines.CDL.utils.scripted_policy import get_scripted_policy, get_is_demo
 
-from env.chemical_env import Chemical
+from Baselines.CDL.env.chemical_env import Chemical
+
+from Environment.Environments.initialize_environment import initialize_environment
+
+def process_breakout(obs):
+    obs = obs['factored_state']
+    for n in obs.keys():
+        if n.find("Block") != -1:
+            obs[n] = np.array([obs[n][-1]])
+        else:
+            obs[n][:2] = np.array(obs[n])[:2] / 84 - 0.5 if type(obs[n]) == list else obs[n][:2] / 84.0 - 0.5
+            obs[n] = obs[n][:4]
+    return obs
 
 
-def train(params):
+def train(params, args):
     device = torch.device("cuda:{}".format(params.cuda_id) if torch.cuda.is_available() else "cpu")
     set_seed_everywhere(params.seed)
 
@@ -41,7 +55,23 @@ def train(params):
     render = False
     num_env = params.env_params.num_env
     is_vecenv = num_env > 1
-    env = get_env(params, render)
+    
+    if args.environment.env in ["Breakout", "RoboPushing"]:
+        env, rec = initialize_environment(args.environment, args.record)
+        if args.environment.env == "Breakout": 
+            env.get_state_cdl = lambda: process_breakout(env.get_state())
+            env.object_sizes["Block"] = 1
+            env.object_sizes["Ball"] = 4
+            env.object_sizes["Paddle"] = 4
+        else:
+            env.get_state_cdl = lambda: env.get_state()['factored_state']
+
+        params.obs_keys = env.all_names
+        params.obs_keys.remove("Action")
+        params.obs_keys.remove("Done")
+        params.obs_keys.remove("Reward")
+    else:
+        env = get_env(params, render)
     if isinstance(env, Chemical):
         torch.save(env.get_save_information(), os.path.join(params.rslts_dir, "chemical_env_params"))
 
@@ -101,6 +131,11 @@ def train(params):
     # init episode variables
     episode_num = 0
     obs = env.reset()
+    n_steps_per_model_train = 1000 # training_params.n_steps_per_model_train
+    if args.environment.env in ["Breakout"]:
+        obs = process_breakout(obs)
+    if args.environment.env in ["RoboPushing"]:
+        obs = obs["factored_state"]
     scripted_policy.reset(obs)
 
     done = np.zeros(num_env, dtype=bool) if is_vecenv else False
@@ -137,6 +172,11 @@ def train(params):
                     episode_num += 1
             elif not is_vecenv and done:
                 obs = env.reset()
+                if args.environment.env in ["Breakout"]:
+                    obs = process_breakout(obs)
+                if args.environment.env in ["RoboPushing"]:
+                    obs = obs["factored_state"]
+
                 if rl_algo == "hippo":
                     policy.reset()
                 scripted_policy.reset(obs)
@@ -174,6 +214,10 @@ def train(params):
                     action = action_policy.act(obs)
 
             next_obs, env_reward, done, info = env.step(action)
+            if args.environment.env in ["Breakout"]:
+                next_obs = process_breakout(next_obs)
+            if args.environment.env in ["RoboPushing"]:
+                next_obs = next_obs["factored_state"]
             if is_task_learning and not is_vecenv:
                 success = success or info["success"]
 
@@ -182,6 +226,7 @@ def train(params):
             episode_step += 1
 
             # is_train: if the transition is training data or evaluation data for inference_cmi
+            print(env_reward)
             replay_buffer.add(obs, action, env_reward, next_obs, done, is_train, info)
 
             # ppo uses its own buffer
@@ -193,15 +238,20 @@ def train(params):
         # training and logging
         if is_init_stage:
             continue
+        if step % n_steps_per_model_train != 0:
+            continue
 
         if inference_gradient_steps > 0:
+            inf_time = time.time()
             inference.train()
             inference.setup_annealing(step)
+            upd = time.time()
             for i_grad_step in range(inference_gradient_steps):
                 obs_batch, actions_batch, next_obses_batch = \
                     replay_buffer.sample_inference(inference_params.batch_size, "train")
                 loss_detail = inference.update(obs_batch, actions_batch, next_obses_batch)
                 loss_details["inference"].append(loss_detail)
+            print("upd", time.time() - upd)
 
             inference.eval()
             if (step + 1) % cmi_params.eval_freq == 0:
@@ -218,8 +268,10 @@ def train(params):
                         replay_buffer.sample_inference(cmi_params.eval_batch_size, use_part="eval")
                     loss_detail = inference.update(obs_batch, actions_batch, next_obses_batch, eval=True)
                     loss_details["inference_eval"].append(loss_detail)
+            print("inference_training", time.time() - inf_time)
 
         if policy_gradient_steps > 0 and rl_algo != "random":
+            pol_time = time.time()
             policy.train()
             if rl_algo in ["ppo", "hippo"]:
                 loss_detail = policy.update()
@@ -234,6 +286,8 @@ def train(params):
                     if use_prioritized_buffer:
                         replay_buffer.update_priorties(idxes_batch, loss_detail["priority"])
                     loss_details["policy"].append(loss_detail)
+            print("policy_training", time.time() - inf_time)
+            # print("loss details", loss_details, policy)
             policy.eval()
 
         if writer is not None:

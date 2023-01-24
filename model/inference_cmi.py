@@ -1,4 +1,6 @@
 import os
+import numpy as np
+import time
 
 import torch
 import torch.nn as nn
@@ -7,9 +9,9 @@ from torch.distributions.normal import Normal
 from torch.distributions.distribution import Distribution
 from torch.distributions.one_hot_categorical import OneHotCategorical
 
-from model.inference import Inference
-from model.inference_utils import reset_layer, forward_network, forward_network_batch, get_state_abstraction
-from utils.utils import to_numpy, preprocess_obs, postprocess_obs
+from Baselines.CDL.model.inference import Inference
+from Baselines.CDL.model.inference_utils import reset_layer, forward_network, forward_network_batch, get_state_abstraction
+from Baselines.CDL.utils.utils import to_numpy, preprocess_obs, postprocess_obs
 
 
 class InferenceCMI(Inference):
@@ -93,6 +95,7 @@ class InferenceCMI(Inference):
                 final_dim = 2 if feature_i_dim == 1 else feature_i_dim
                 self.generative_last_layer_weights.append(nn.Parameter(torch.zeros(1, in_dim, final_dim)))
                 self.generative_last_layer_biases.append(nn.Parameter(torch.zeros(1, 1, final_dim)))
+        print(self)
 
     def reset_params(self):
         feature_dim = self.feature_dim
@@ -182,7 +185,10 @@ class InferenceCMI(Inference):
             x = torch.stack(x, dim=1)                                       # (feature_dim, feature_dim, bs, out_dim)
             x = x.view(feature_dim * feature_dim, *x.shape[2:])             # (feature_dim * feature_dim, bs, out_dim)
 
+        # print("state feature forward")
+        print(x, self.state_feature_weights, self.state_feature_biases)
         state_feature = forward_network(x, self.state_feature_weights, self.state_feature_biases)
+        # print(state_feature)
         state_feature = state_feature.view(feature_dim, feature_dim, bs, -1)
         return state_feature                                                # (feature_dim, feature_dim, bs, out_dim)
 
@@ -243,11 +249,13 @@ class InferenceCMI(Inference):
             generative_last_layer_weights = self.generative_last_layer_weights
             generative_last_layer_biases = self.generative_last_layer_biases
 
+        # print("sum inputs", sa_feature, [g.data for g in generative_weights], [g.data for g in generative_biases])
         x = forward_network(sa_feature, generative_weights, generative_biases)
 
         if self.continuous_state:
             x = x.permute(1, 0, 2)                                          # (bs, feature_dim, 2)
             mu, log_std = x.unbind(dim=-1)                                  # (bs, feature_dim) * 2
+            # print("mu", mu, residual_base, log_std, log_std.shape)
             return self.normal_helper(mu, residual_base, log_std)
         else:
             x = F.relu(x)                                                   # (feature_dim, bs, out_dim)
@@ -289,6 +297,8 @@ class InferenceCMI(Inference):
             if state space is continuous: a Normal distribution of shape (bs, feature_dim)
             else: a list of distributions, [OneHotCategorical / Normal] * feature_dim, each of shape (bs, feature_i_dim)
         """
+        # TODO: replace this function. Instead of performing forward by extracting the features
+        # simply replace this with a key pairnet which iterates through all of the pairs
         forward_full = full_feature is not None
         forward_masked = masked_feature is not None
         forward_causal = causal_feature is not None
@@ -395,6 +405,7 @@ class InferenceCMI(Inference):
                 features.extend(x)
         features = torch.cat(features, dim=0)                                   # (total_num_parent, bs, 1)
 
+        # print("state_feature abstraction")
         state_feature = forward_network(features,
                                         self.abstraction_state_feature_weights,
                                         self.abstraction_state_feature_biases)
@@ -526,9 +537,12 @@ class InferenceCMI(Inference):
             if abstraction_mode and self.abstraction_quested:
                 causal_dist = self.forward_step_abstraction(causal_feature, action)
             else:
+                # print("forward features", full_feature, "mf", masked_feature, "cf", causal_feature, action, mask,
+                #                       action_feature, full_state_feature)
                 full_dist, masked_dist, causal_dist = \
                     self.forward_step(full_feature, masked_feature, causal_feature, action, mask,
                                       action_feature, full_state_feature)
+                # print(full_dist, masked_dist, causal_dist)
 
             full_dist, full_feature = get_dist_and_feature(prev_full_dist, full_dist)
             masked_dist, masked_feature = get_dist_and_feature(prev_masked_dist, masked_dist)
@@ -682,17 +696,27 @@ class InferenceCMI(Inference):
 
         feature = self.encoder(obs)
         next_feature = self.encoder(next_obses)
+        # print("features for dist", feature, next_feature, self.encoder)
+        # fore_time = time.time()
         pred_next_dist = self.forward_with_feature(feature, actions, mask, forward_mode=forward_mode)
+        # print("fore_time", time.time() - fore_time)
 
         # prediction loss in the state / latent space, (bs, n_pred_step)
         if not self.update_num % (eval_freq * inference_gradient_steps):
             pred_next_dist = pred_next_dist[:2]
+        # pred_time = time.time()
+        print(feature, next_feature)
         pred_loss, loss_detail = self.prediction_loss_from_multi_dist(pred_next_dist, next_feature)
+        # print("pred_time", time.time() - pred_time)
 
         loss = pred_loss
+        print("loss, pred loss", loss)
+        back_time = time.time()
 
         if not eval and torch.isfinite(loss):
             self.backprop(loss, loss_detail)
+        # print("back_time", time.time() - back_time)
+        error
 
         return loss_detail
 

@@ -15,10 +15,11 @@ print(sys.path)
 
 from robosuite.controllers import load_controller_config
 from robosuite.utils.input_utils import *
-from env.physical_env import Physical
-from env.chemical_env import Chemical
-from utils.multiprocessing_env import SubprocVecEnv
-from Environments.Breakout.breakout_screen import Breakout
+from Baselines.CDL.env.physical_env import Physical
+from Baselines.CDL.env.chemical_env import Chemical
+from Baselines.CDL.utils.multiprocessing_env import SubprocVecEnv
+from Environment.Environments.Breakout.breakout_screen import Breakout
+from Environment.Environments.RoboPushing.robopushing_screen import RoboPushing
 
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
@@ -48,10 +49,10 @@ class TrainingParams(AttrDict):
                                                               training_params.load_replay_buffer)
 
         if train:
-            if training_params_fname == "policy_params.json":
-                sub_dirname = "task" if training_params.rl_algo == "model_based" else "dynamics"
-            else:
-                raise NotImplementedError
+            # if training_params_fname == "policy_params.json":
+            sub_dirname = "task" if training_params.rl_algo == "model_based" else "dynamics"
+            # else:
+            #     raise NotImplementedError
 
             info = self.info.replace(" ", "_")
             experiment_dirname = info + "_" + time.strftime("%Y_%m_%d_%H_%M_%S")
@@ -60,7 +61,8 @@ class TrainingParams(AttrDict):
             shutil.copyfile(training_params_fname, os.path.join(self.rslts_dir, "params.json"))
 
             self.replay_buffer_dir = None
-            if training_params_fname == "policy_params.json" and training_params.replay_buffer_params.saving_freq:
+            # if training_params_fname == "policy_params.json" and 
+            if training_params.replay_buffer_params.saving_freq:
                 self.replay_buffer_dir = os.path.join(repo_path, "replay_buffer", experiment_dirname)
                 os.makedirs(self.replay_buffer_dir)
 
@@ -155,24 +157,48 @@ def update_obs_act_spec(env, params):
     """
     get act_dim and obs_spec from env and add to params
     """
-    params.continuous_state = params.continuous_action = params.continuous_factor = \
-        not isinstance(env, (Physical, Chemical, Breakout))
+    params.continuous_state = params.continuous_factor = \
+        not isinstance(env, (Physical, Chemical))
+    params.continuous_action = params.continuous_state if not isinstance(env, (Breakout)) else not env.discrete_actions 
     if params.encoder_params.encoder_type == "conv":
         params.continuous_state = True
 
-    params.action_dim = env.action_dim
-    params.obs_spec = obs_spec = preprocess_obs(env.observation_spec(), params)
+    params.action_dim = env.action_dim if hasattr(env, "action_dim") else (env.action_shape[0] if not env.discrete_actions else env.num_actions)
+    if hasattr(env, "observation_spec"):
+        params.obs_spec = obs_spec = preprocess_obs(env.observation_spec(), params)
+    else:
+        params.obs_spec = obs_spec = preprocess_obs(env.get_state_cdl(), params)
+        env.observation_spec = lambda: env.get_state_cdl()
 
     if params.continuous_factor:
         params.obs_dims = None
-        params.action_spec = env.action_spec
+        if isinstance(env, Breakout):
+            params.action_spec = env.action_space
+        elif isinstance(env, RoboPushing):
+            params.action_spec = (env.action_space.low, env.action_space.high)
+        else:
+            params.action_spec = env.action_spec if hasattr(env, "action_spec") else env.action_space
         # workspace_spec = env.workspace_spec()
         # workspace_spec = {k: v for k, v in workspace_spec.items() if k in params.obs_keys}
         # params.workspace_spec = workspace_spec
         # params.workspace_scale = workspace_scale = {k: v[1] - v[0] for k, v in workspace_spec.items()}
         # params.workspace_scale_array = np.concatenate([workspace_scale[k] for k in params.obs_keys], axis=-1)
     else:
-        params.obs_dims = obs_dims = env.observation_dims()
+        if hasattr(env, "observation_dims"):
+            params.obs_dims = obs_dims = env.observation_dims()
+        else:
+            all_object_sizes = dict() 
+            size_keys = set(env.object_sizes.keys())
+            for name in env.all_names:
+                if name in size_keys:
+                    all_object_sizes[name] = np.array([env.object_sizes[name]])
+                for sn in size_keys:
+                    if name.find(sn) != -1:
+                        all_object_sizes[name] = np.array([env.object_sizes[sn]])
+                        break
+            params.obs_dims = obs_dims = all_object_sizes
+
+            env.observation_dims = lambda: all_object_sizes
         params.action_spec = None
 
 
@@ -206,6 +232,8 @@ def get_single_env(params, render=False):
         env = Chemical(params)
     elif env_name == "Breakout":
         env = Breakout()
+    elif env_name == "RoboPushing":
+        env = RoboPushing()
     else:
         raise ValueError("Unknown env_name: {}".format(env_name))
 

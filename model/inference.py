@@ -1,3 +1,4 @@
+import time
 import os
 import numpy as np
 
@@ -11,7 +12,7 @@ from torch.distributions.distribution import Distribution
 from torch.distributions.one_hot_categorical import OneHotCategorical
 from torch.distributions.kl import kl_divergence
 
-from utils.utils import to_numpy, preprocess_obs, postprocess_obs
+from Baselines.CDL.utils.utils import to_numpy, preprocess_obs, postprocess_obs
 
 
 class Inference(nn.Module):
@@ -112,6 +113,7 @@ class Inference(nn.Module):
         if self.residual:
             mean_ = mean_ + base_
         log_std_ = torch.clip(log_std_, min=self.log_std_min, max=self.log_std_max)
+        # print("normal", self.log_std_min, self.log_std_max)
         std_ = torch.exp(log_std_)
         return Normal(mean_, std_)
 
@@ -157,6 +159,7 @@ class Inference(nn.Module):
         :return: (bs, feature_dim)
         """
         if self.continuous_state:
+            # print("dvs", dist,dist.loc, dist.scale, value, dist.log_prob(value), value.shape)
             return dist.log_prob(value)
         else:
             log_prob = []
@@ -252,6 +255,7 @@ class Inference(nn.Module):
                 next_feature = next_feature.detach()
             else:
                 next_feature = [next_feature_i.detach() for next_feature_i in next_feature]
+            # print("log_prob_from_dist input", next_feature, next_feature)
             pred_loss = -self.log_prob_from_distribution(pred_dist, next_feature)       # (bs, n_pred_step, feature_dim)
 
         if not keep_variable_dim:
@@ -278,17 +282,22 @@ class Inference(nn.Module):
         :param next_obses: ({obs_i_key: (bs, num_pred_steps, obs_i_shape)}
         :return: {"loss_name": loss_value}
         """
+        enc = time.time()
         features = self.encoder(obses)
         next_features = self.encoder(next_obses)
         pred_next_dist = self.forward_with_feature(features, actions)
-
+        print("encode", time.time() - enc)
         # prediction loss in the state / latent space
+        losstim = time.time()
         pred_loss = self.prediction_loss_from_dist(pred_next_dist, next_features)    # (bs, num_pred_steps)
         loss = pred_loss = pred_loss.sum(dim=-1).mean()
+        print("losstim", time.time() - losstim)
+        # print(pred_loss)
+        backprop = time.time()
         loss_detail = {"pred_loss": pred_loss}
-
         if not eval:
             self.backprop(loss, loss_detail)
+        print("backprop", time.time() - backprop)
 
         return loss_detail
 

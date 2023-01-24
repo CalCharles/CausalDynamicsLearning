@@ -15,9 +15,9 @@ import matplotlib as mpl
 import skimage
 import skimage.draw
 
-from env.drawing import diamond, square, triangle, cross, pentagon, parallelogram, scalene_triangle
-from env.drawing import render_cubes, get_colors_and_weights
-from env.physical_env import Coord
+from Baselines.CDL.env.drawing import diamond, square, triangle, cross, pentagon, parallelogram, scalene_triangle
+from Baselines.CDL.env.drawing import render_cubes, get_colors_and_weights
+from Baselines.CDL.env.physical_env import Coord
 import random
 
 

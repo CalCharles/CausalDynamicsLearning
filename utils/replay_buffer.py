@@ -2,8 +2,8 @@ import os
 import torch
 import numpy as np
 
-from utils.utils import preprocess_obs, postprocess_obs, to_numpy
-from utils.sum_tree import SumTree
+from Baselines.CDL.utils.utils import preprocess_obs, postprocess_obs, to_numpy
+from Baselines.CDL.utils.sum_tree import SumTree
 
 
 def take(array, start, end):

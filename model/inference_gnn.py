@@ -5,8 +5,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.one_hot_categorical import OneHotCategorical
 
-from model.inference_mlp import InferenceMLP
-from model.inference_utils import reparameterize
+from Baselines.CDL.model.inference_mlp import InferenceMLP
+from Baselines.CDL.model.inference_utils import reparameterize
 
 
 class InferenceGNN(InferenceMLP):

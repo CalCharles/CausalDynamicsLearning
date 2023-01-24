@@ -8,7 +8,7 @@ import torch.optim as optim
 from torch.distributions.categorical import Categorical
 from torch.distributions.normal import Normal
 
-from utils.utils import to_numpy, preprocess_obs, postprocess_obs
+from Baselines.CDL.utils.utils import to_numpy, preprocess_obs, postprocess_obs
 
 
 class ActionDistribution:

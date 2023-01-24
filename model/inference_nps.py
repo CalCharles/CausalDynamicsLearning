@@ -8,8 +8,8 @@ from torch.distributions.normal import Normal
 from torch.distributions.one_hot_categorical import OneHotCategorical
 
 
-from model.inference import Inference
-from model.inference_utils import reset_layer, forward_network, forward_network_batch
+from Baselines.CDL.model.inference import Inference
+from Baselines.CDL.model.inference_utils import reset_layer, forward_network, forward_network_batch
 
 
 class Attention(nn.Module):

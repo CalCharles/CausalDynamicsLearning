@@ -11,8 +11,8 @@ from torch.distributions.normal import Normal
 from torch.distributions.categorical import Categorical
 from torch.distributions.one_hot_categorical import OneHotCategorical
 
-from model.hippo_skills import SkillController
-from utils.utils import to_numpy, preprocess_obs, postprocess_obs
+from Baselines.CDL.model.hippo_skills import SkillController
+from Baselines.CDL.utils.utils import to_numpy, preprocess_obs, postprocess_obs
 
 EPS = 1e-6
 

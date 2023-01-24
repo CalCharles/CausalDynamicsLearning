@@ -1,11 +1,12 @@
 import numpy as np
 from collections import deque, OrderedDict
+import time
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from model.gumbel import gumbel_sigmoid
+from Baselines.CDL.model.gumbel import gumbel_sigmoid
 
 
 def reset_layer(w, b):
@@ -13,6 +14,8 @@ def reset_layer(w, b):
     fan_in = w.shape[1]
     bound = 1 / np.sqrt(fan_in)
     nn.init.uniform_(b, -bound, bound)
+    w = w / 10000
+    b = b / 10000
 
 
 def reparameterize(mu, log_std):
@@ -27,6 +30,7 @@ def forward_network(input, weights, biases, activation=F.relu):
         apply the network to each input, and return output
     the same activation function is applied to all layers except for the last layer
     """
+    forward_time = time.time()
     x = input
     for i, (w, b) in enumerate(zip(weights, biases)):
         # x (p_bs, bs, in_dim), bs: data batch size which must be 1D
@@ -35,6 +39,8 @@ def forward_network(input, weights, biases, activation=F.relu):
         x = torch.bmm(x, w) + b
         if i < len(weights) - 1 and activation:
             x = activation(x)
+    #     print("weights", w.shape, b.shape)
+    # print("forward_time", time.time() - forward_time, input.shape)
     return x
 
 
@@ -43,6 +49,7 @@ def forward_network_batch(inputs, weights, biases, activation=F.relu):
     given a list of inputs and a list of ONE-LAYER networks (i.e., a list of weights and a list of biases),
         apply each network to each input, and return a list
     """
+    forward_time = time.time()
     x = []
     for x_i, w, b in zip(inputs, weights, biases):
         # x_i (p_bs, bs, in_dim), bs: data batch size which must be 1D
@@ -52,6 +59,7 @@ def forward_network_batch(inputs, weights, biases, activation=F.relu):
         if activation:
             x_i = activation(x_i)
         x.append(x_i)
+    # print("forward_batch", time.time() - forward_time)
     return x
 
 

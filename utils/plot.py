@@ -4,7 +4,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from utils.utils import to_numpy
+from Baselines.CDL.utils.utils import to_numpy
 
 
 def set_axes_equal(ax):

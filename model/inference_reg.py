@@ -3,10 +3,10 @@ import numpy as np
 
 import torch
 
-from model.inference import Inference
-from model.inference_cmi import InferenceCMI
-from model.gumbel import GumbelMatrix, ConditionalGumbelMatrix
-from utils.utils import to_numpy, preprocess_obs, postprocess_obs
+from Baselines.CDL.model.inference import Inference
+from Baselines.CDL.model.inference_cmi import InferenceCMI
+from Baselines.CDL.model.gumbel import GumbelMatrix, ConditionalGumbelMatrix
+from Baselines.CDL.utils.utils import to_numpy, preprocess_obs, postprocess_obs
 
 EPS = 1e-4
 

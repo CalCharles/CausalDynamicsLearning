@@ -6,7 +6,7 @@ https://github.com/ARISE-Initiative/robosuite/blob/maple/robosuite/controllers/s
 """
 
 import numpy as np
-from utils.utils import to_numpy
+from Baselines.CDL.utils.utils import to_numpy
 
 
 class BaseSkill:

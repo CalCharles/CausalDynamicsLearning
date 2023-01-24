@@ -1,7 +1,7 @@
 import random
 import numpy as np
 
-from env.physical_env import Coord
+from Baselines.CDL.env.physical_env import Coord
 
 
 def get_is_demo(step, params):
@@ -356,6 +356,26 @@ class ScriptedBreakout:
         # a = np.random.multinomial(1, p).argmax()
         # return a
 
+class ScriptedRoboPushing:
+    def __init__(self, env, params):
+        self.env = env
+        self.params = params
+        self.action_spec = params.action_spec
+
+    def reset(self, *args):
+        pass
+
+    def act(self, obs, deterministic=True):
+        return self.act_randomly()
+
+    def act_randomly(self,):
+        return self.action_spec.sample()
+        # below for collecting dense graph only
+        # p = np.concatenate([[i * 0.5 + 1.0] * 5 for i in range(10)])
+        # p /= p.sum()
+        # a = np.random.multinomial(1, p).argmax()
+        # return a
+
 
 
 def get_scripted_policy(env, params):
@@ -372,5 +392,7 @@ def get_scripted_policy(env, params):
         return ScriptedChemical(env, params)
     elif env_name == "Breakout":
         return ScriptedBreakout(env, params)
+    elif env_name == "RoboPushing":
+        return ScriptedRoboPushing(env, params)
     else:
         raise ValueError("Unknown env_name: {}".format(env_name))
